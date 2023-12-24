@@ -36,38 +36,47 @@ Before getting started, make sure you have a __Docker Daemon__ instance running 
 Refer to the [docker installation process](https://docs.docker.com/engine/install/) to install 
 it properly. You may check that it is running by trying the following command:
 ```shell
-docker help
+docker --version
 ```
 
-If it is running, you'll get a description of the commands available to you. If it isn't... you're
+If it is running, you'll get a short answer giving you the used version of docker. If it isn't... you're
 going to be getting and error!
 
-### Running MongoDB
+### Installing Mongo Shell
+
+Another dependency is Mongo Shell, make sure you have a __Mongo Shell__ executable in your $PATH.
+Refer to the [MongoDB Community Edition installation process](https://www.mongodb.com/docs/manual/administration/install-community/) to install
+it properly. You may check that it is running by trying the following command:
+```shell
+mongosh --version
+```
+
+If it is running, you'll get a short answer giving you the used version of mongosh. If it isn't... you're
+going to be getting and error!
+
+### Running services
 
 This search engine depends on a NoSQL database to save collections of documents (including webpages
 themselves, page graphs and page ranking data). While you could use different volumes for different
-collections, we're going to keep it simple here. We're going to run a single instance, and utilize
-the built-in volume of that instance.
+collections, we're going to keep it simple here. We're going to run a single instance, but we're going 
+to have to make it into a replica set due to functionalities only available to replica sets.
 
-However, it would be wise, for long-term persistence, to allocate dedicated volume[s] and to link
-them with the instance[s].  
-
-To launch a __MongoDB__ instance locally using __Docker__, run the following command:
-
-```shell
-docker run --name search-engine.mongodb -d -p 27017:27017 mongo
-```
-
-### Running RabbitMQ
-
-This search engine depends on AMQPs to distribute the work across workers. While you could use 
-different servers for different streams, we're going to keep it simple here. We're going to run a
+This search engine also depends on AMQPs to distribute the work across workers. While you could use
+different servers for different streams, we're going to, again, keep it simple here. We're going to run a
 single instance, and utilize multiple channels on that instance.
 
-To launch a __RabbitMQ__ instance locally using __Docker__, run the following command:
+To launch all services locally using __Docker__, run the following command:
 
 ```shell
-docker run --name search-engine.rabbitmq -d -p 5672:5672 rabbitmq
+sh ./setup-env.sh
+```
+
+### Verifying the services are running
+
+Additionally, you may check that all the containers are up and running using the following command:
+
+```shell
+docker ps
 ```
 
 ## Configurations

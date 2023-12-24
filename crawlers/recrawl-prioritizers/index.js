@@ -3,23 +3,43 @@ require('module-alias/register');
 const errors = require('@shared/error-codes');
 
 const { setupProducer } = require('@shared/amqp');
+const { WebpageMetadata } = require("@shared/models/webpage");
 
 require('dotenv').config();
 require('@shared/stores').connect(process.env.STORE_URL);
 
 async function start(urlFrontierProducer) {
 
-    const url = process.env.ENTRY_POINT;
     let counter = 0;
-
-    async function foo() {
-        for (let i = 0; i < 1_000; i++) {
-            console.log(`${++counter}.\tRecrawling: ${url}`);
-            urlFrontierProducer.produce({ url });
-        }
+    function queue(url) {
+        console.log(`${ ++counter }.\tQueuing: ${ url }`);
+        urlFrontierProducer.produce({ url });
     }
 
-    await foo();
+    const metadataChangeStream = WebpageMetadata.watch();
+
+    function setupMetadataChangeListener() {
+        metadataChangeStream.on('change', (change) => {
+            if (change.operationType === 'insert' &&
+                change.fullDocument.timestampOfLastCrawl === 0) {
+                queue(change.fullDocument.url);
+            }
+        });
+    }
+
+    async function queueNewWebpages() {
+        const allNewWebpages = await WebpageMetadata.find(
+            { timestampOfLastCrawl: 0 },
+            { url: 1 }
+        );
+
+        allNewWebpages.forEach((webpage) => queue(webpage.url));
+    }
+
+    setupMetadataChangeListener();
+    await queueNewWebpages();
+
+    queue(process.env.ENTRY_POINT);
 }
 
 (async () => {

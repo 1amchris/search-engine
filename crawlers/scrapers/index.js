@@ -25,7 +25,7 @@ async function start(urlFrontierConsumer, downstreamBrokerProducer) {
 
             await WebpageObject.findOneAndUpdate(
                 {urlId},
-                {urlId, url, html: response.data},
+                {urlId, html: response.data},
                 {upsert: true, new: true},
             );
 

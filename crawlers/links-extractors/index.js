@@ -6,7 +6,7 @@ const errors = require('@shared/error-codes');
 const md5 = require('@shared/utils/md5');
 
 const { setupConsumer } = require("@shared/amqp");
-const { WebpageMetadata, WebpageObject } = require('@shared/models/webpage');
+const { WebpageLink, WebpageMetadata, WebpageObject } = require('@shared/models/webpage');
 
 require('dotenv').config();
 require('@shared/stores').connect(process.env.STORE_URL);
@@ -19,7 +19,26 @@ async function start(downstreamBrokerConsumer) {
 
         console.log(`${++counter}.\tExtracting from: ${sourceUrlId}`);
 
-        const webpage = await WebpageObject.findOne({ urlId: sourceUrlId })
+        const webpages = await WebpageObject.aggregate([
+            { $match: { urlId: sourceUrlId } },
+            { $lookup: {
+                from: WebpageMetadata.collection.name,
+                localField: 'urlId',
+                foreignField: 'urlId',
+                as: 'metadata',
+            }},
+            { $unwind: {
+                path: '$metadata',
+                preserveNullAndEmptyArrays: true,
+            }},
+            { $limit: 1 },
+        ]);
+
+        if (webpages.size === 0) {
+            return;
+        }
+
+        const webpage = webpages[0];
         const $ = cheerio.load(webpage.html);
 
         await Promise.all(
@@ -29,7 +48,7 @@ async function start(downstreamBrokerConsumer) {
 
             if (url) {
                 url = !url.startsWith('http')
-                    ? new URL(url, webpage.url).href
+                    ? new URL(url, webpage.metadata.url).href
                     : url;
 
                 const urlId = md5(url);
@@ -42,6 +61,12 @@ async function start(downstreamBrokerConsumer) {
                         },
                         { upsert: true },
                     )
+
+                    await WebpageLink.findOneAndUpdate(
+                        { sourceUrlId, destinationUrlId: urlId },
+                        { sourceUrlId, destinationUrlId: urlId },
+                        { upsert: true }
+                    )
                 }
             }
         }));
@@ -52,7 +77,9 @@ async function start(downstreamBrokerConsumer) {
 
 (async () => {
     const downstreamBrokerConsumer = await setupConsumer(process.env.DOWNSTREAM_BROKER_URL, process.env.DOWNSTREAM_BROKER_QUEUE);
-    if (downstreamBrokerConsumer === null) { process.exit(errors.AMQP_FAILED); }
+    if (downstreamBrokerConsumer === null) {
+        process.exit(errors.AMQP_FAILED);
+    }
 
     await start(downstreamBrokerConsumer);
 })();
