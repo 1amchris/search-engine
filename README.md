@@ -1,5 +1,3 @@
-# search-engine
-
 ## Onboarding
 
 ### Setting up the dependencies:
